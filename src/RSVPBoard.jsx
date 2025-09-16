@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Undo2, Download, Upload, Plus, X, Edit2, UserPlus, Trash2 } from "lucide-react";
+import { Undo2, Download, Upload, Plus, X, Edit2, UserPlus, Trash2, Save, FolderOpen } from "lucide-react";
 
 // Empty default - will load from localStorage or start fresh
 const EMPTY_DATA = {
@@ -25,6 +25,7 @@ const EXAMPLE_DATA = {
 };
 
 const STORAGE_KEY = "rsvp-board-state-v3";
+const SAVED_SNAPSHOT_KEY = "rsvp-board-saved-snapshot";
 
 const tackColors = {
   "Yes": "bg-gradient-to-br from-yellow-400 to-yellow-600",
@@ -60,11 +61,17 @@ export default function RSVPBoard() {
   const [newName, setNewName] = useState("");
   const [editingName, setEditingName] = useState(null);
   const [editValue, setEditValue] = useState("");
+  const [hasSavedSnapshot, setHasSavedSnapshot] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(lists));
   }, [lists]);
+
+  useEffect(() => {
+    // Check if there's a saved snapshot on mount
+    setHasSavedSnapshot(!!localStorage.getItem(SAVED_SNAPSHOT_KEY));
+  }, []);
 
   const counts = useMemo(() => ({
     yes: lists["Yes"].length,
@@ -181,13 +188,34 @@ export default function RSVPBoard() {
     setEditValue("");
   }
 
-  function reset(useExample = false) {
-    const message = useExample
-      ? "Load example data? This will replace all current names."
-      : "Clear all names from the board?";
+  function saveSnapshot() {
+    if (window.confirm("Save current board state? This will overwrite any previously saved state.")) {
+      localStorage.setItem(SAVED_SNAPSHOT_KEY, JSON.stringify(lists));
+      setHasSavedSnapshot(true);
+      alert("Board state saved successfully!");
+    }
+  }
 
-    if (window.confirm(message)) {
-      setLists(useExample ? EXAMPLE_DATA : EMPTY_DATA);
+  function loadSnapshot() {
+    if (window.confirm("Load saved state? This will replace all current names.")) {
+      try {
+        const savedSnapshot = localStorage.getItem(SAVED_SNAPSHOT_KEY);
+        if (savedSnapshot) {
+          setLists(JSON.parse(savedSnapshot));
+        } else {
+          // Fall back to example data if no snapshot exists
+          setLists(EXAMPLE_DATA);
+        }
+      } catch (e) {
+        console.error("Failed to load snapshot:", e);
+        setLists(EXAMPLE_DATA);
+      }
+    }
+  }
+
+  function clearBoard() {
+    if (window.confirm("Clear all names from the board?")) {
+      setLists(EMPTY_DATA);
     }
   }
 
@@ -314,14 +342,28 @@ export default function RSVPBoard() {
                           <Download className="h-4 w-4"/>Export
                         </button>
                         <button
-                          onClick={() => reset(true)}
-                          className="px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded shadow-md hover:from-green-700 hover:to-green-800 border border-yellow-400"
-                          title="Load example data"
+                          onClick={saveSnapshot}
+                          className="px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded shadow-md hover:from-green-700 hover:to-green-800 flex items-center gap-2 border border-yellow-400"
+                          title="Save current board state"
                         >
-                          Example
+                          <Save className="h-4 w-4"/>Save Current
                         </button>
                         <button
-                          onClick={() => reset(false)}
+                          onClick={loadSnapshot}
+                          className={`px-3 py-2 bg-gradient-to-r ${
+                            hasSavedSnapshot
+                              ? 'from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+                              : 'from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700'
+                          } text-white rounded shadow-md flex items-center gap-2 border ${
+                            hasSavedSnapshot ? 'border-yellow-400' : 'border-gray-400'
+                          }`}
+                          title={hasSavedSnapshot ? "Load saved state" : "Load default list (no saved state)"}
+                        >
+                          <FolderOpen className="h-4 w-4"/>
+                          {hasSavedSnapshot ? 'Load Saved' : 'Load Default'}
+                        </button>
+                        <button
+                          onClick={clearBoard}
                           className="px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded shadow-md hover:from-red-700 hover:to-red-800 flex items-center gap-2 border border-red-400"
                           title="Clear all names"
                         >
